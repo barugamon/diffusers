@@ -122,6 +122,7 @@ class UnCLIPPipeline(DiffusionPipeline):
         do_classifier_free_guidance,
         text_model_output: Optional[Union[CLIPTextModelOutput, Tuple]] = None,
         text_attention_mask: Optional[torch.Tensor] = None,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
     ):
         if text_model_output is None:
             batch_size = len(prompt) if isinstance(prompt, list) else 1
@@ -158,7 +159,7 @@ class UnCLIPPipeline(DiffusionPipeline):
         text_mask = text_mask.repeat_interleave(num_images_per_prompt, dim=0)
 
         if do_classifier_free_guidance:
-            uncond_tokens = [""] * batch_size
+            uncond_tokens = [negative_prompt] * batch_size if isinstance(negative_prompt, str) else [""] * batch_size
 
             uncond_input = self.tokenizer(
                 uncond_tokens,
@@ -245,6 +246,7 @@ class UnCLIPPipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Optional[Union[str, List[str]]] = None,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: int = 1,
         prior_num_inference_steps: int = 25,
         decoder_num_inference_steps: int = 25,
@@ -267,6 +269,8 @@ class UnCLIPPipeline(DiffusionPipeline):
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation. This can only be left undefined if
                 `text_model_output` and `text_attention_mask` is passed.
+            negative_prompt (`str` or `List[str]`):
+                The prompt or prompts to guide the image generation AGAINST, so the final image resembles less what is described here. If left undefined, it will default to an empty string, which in turn will be made into an uncoditioned image embedding, basically driving the image generation against the model's mean output.
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             prior_num_inference_steps (`int`, *optional*, defaults to 25):
@@ -329,7 +333,7 @@ class UnCLIPPipeline(DiffusionPipeline):
         do_classifier_free_guidance = prior_guidance_scale > 1.0 or decoder_guidance_scale > 1.0
 
         text_embeddings, text_encoder_hidden_states, text_mask = self._encode_prompt(
-            prompt, device, num_images_per_prompt, do_classifier_free_guidance, text_model_output, text_attention_mask
+            prompt, device, num_images_per_prompt, do_classifier_free_guidance, text_model_output, text_attention_mask, negative_prompt
         )
 
         # prior
@@ -359,7 +363,7 @@ class UnCLIPPipeline(DiffusionPipeline):
                 encoder_hidden_states=text_encoder_hidden_states,
                 attention_mask=text_mask,
             ).predicted_image_embedding
-
+            
             if do_classifier_free_guidance:
                 predicted_image_embedding_uncond, predicted_image_embedding_text = predicted_image_embedding.chunk(2)
                 predicted_image_embedding = predicted_image_embedding_uncond + prior_guidance_scale * (
