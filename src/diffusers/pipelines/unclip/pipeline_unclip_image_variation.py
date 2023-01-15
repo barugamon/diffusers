@@ -122,7 +122,7 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
         latents = latents * scheduler.init_noise_sigma
         return latents
 
-    def _encode_prompt(self, prompt, device, num_images_per_prompt, do_classifier_free_guidance):
+    def _encode_prompt(self, prompt, negative_prompt, device, num_images_per_prompt, do_classifier_free_guidance):
         batch_size = len(prompt) if isinstance(prompt, list) else 1
 
         # get prompt text embeddings
@@ -144,7 +144,7 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
         text_mask = text_mask.repeat_interleave(num_images_per_prompt, dim=0)
 
         if do_classifier_free_guidance:
-            uncond_tokens = [""] * batch_size
+            uncond_tokens = [negative_prompt] * batch_size if isinstance(negative_prompt, str) else [""] * batch_size
 
             max_length = text_input_ids.shape[-1]
             uncond_input = self.tokenizer(
@@ -246,6 +246,8 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
     def __call__(
         self,
         image: Optional[Union[PIL.Image.Image, List[PIL.Image.Image], torch.FloatTensor]] = None,
+        prompt: Optional[Union[str, List[str]]] = None,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: int = 1,
         decoder_num_inference_steps: int = 25,
         super_res_num_inference_steps: int = 7,
@@ -266,6 +268,13 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
                 configuration of
                 [this](https://huggingface.co/fusing/karlo-image-variations-diffusers/blob/main/feature_extractor/preprocessor_config.json)
                 `CLIPFeatureExtractor`. Can be left to `None` only when `image_embeddings` are passed.
+            prompt (`str` or `List[str]`):
+                The prompt or prompts to guide the image generation. This can only be left undefined if
+                `text_model_output` and `text_attention_mask` is passed.
+            negative_prompt (`str` or `List[str]`):
+                The prompt or prompts to guide the image generation AGAINST, so the final image
+                resembles less what is described here. If left undefined, it will default to an empty
+                string, which in turn will be made into an uncoditioned image embedding, basically driving the image generation against the model's mean output.
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             decoder_num_inference_steps (`int`, *optional*, defaults to 25):
@@ -306,7 +315,7 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
         else:
             batch_size = image_embeddings.shape[0]
 
-        prompt = [""] * batch_size
+        prompt = [prompt] * batch_size if isinstance(prompt, str) else [""] * batch_size
 
         device = self._execution_device
 
@@ -315,7 +324,7 @@ class UnCLIPImageVariationPipeline(DiffusionPipeline):
         do_classifier_free_guidance = decoder_guidance_scale > 1.0
 
         text_embeddings, text_encoder_hidden_states, text_mask = self._encode_prompt(
-            prompt, device, num_images_per_prompt, do_classifier_free_guidance
+            prompt, negative_prompt, device, num_images_per_prompt, do_classifier_free_guidance
         )
 
         image_embeddings = self._encode_image(image, device, num_images_per_prompt, image_embeddings)

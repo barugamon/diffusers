@@ -270,7 +270,9 @@ class UnCLIPPipeline(DiffusionPipeline):
                 The prompt or prompts to guide the image generation. This can only be left undefined if
                 `text_model_output` and `text_attention_mask` is passed.
             negative_prompt (`str` or `List[str]`):
-                The prompt or prompts to guide the image generation AGAINST, so the final image resembles less what is described here. If left undefined, it will default to an empty string, which in turn will be made into an uncoditioned image embedding, basically driving the image generation against the model's mean output.
+                The prompt or prompts to guide the image generation AGAINST, so the final image
+                resembles less what is described here. If left undefined, it will default to an empty
+                string, which in turn will be made into an uncoditioned image embedding, basically driving the image generation against the model's mean output.
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             prior_num_inference_steps (`int`, *optional*, defaults to 25):
